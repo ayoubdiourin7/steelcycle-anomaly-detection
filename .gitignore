@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local environments and caches
+.venv/
+.cache/
+.mplconfig/
+
+# macOS
+.DS_Store
+
+# Generated plots
+*energie_fem_anomalies.png
+*energie_fem_ratio_counts.png
