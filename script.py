@@ -280,6 +280,11 @@ def process_folder(input_folder: str, anomaly_factor: float = 1.0) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot Energy ratios and anomalies from Excel files.")
     parser.add_argument(
+        "--file",
+        type=str,
+        help="Input .xlsx file to process.",
+    )
+    parser.add_argument(
         "--folder",
         type=str,
         help="Input folder containing .xlsx files (recursive). All files are merged and treated as one dataset.",
@@ -292,8 +297,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    if args.file and args.folder:
+        parser.error("Use only one input: --file or --folder.")
     if args.folder:
         process_folder(args.folder, anomaly_factor=args.factor)
+    elif args.file:
+        process_file(args.file, anomaly_factor=args.factor)
     else:
-        for file_name in ["1.xlsx", "2.xlsx"]:
-            process_file(file_name, anomaly_factor=args.factor)
+        parser.error("Missing input. Provide --folder <path> or --file <path>.")

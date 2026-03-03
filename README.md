@@ -7,8 +7,8 @@ This project analyzes EAF cycle Excel files and generates anomaly plots for:
 
 It supports:
 
-- single-file processing
-- folder processing (recursive), where all `.xlsx` files are merged and treated as one dataset
+- single-file processing (explicit `--file`)
+- folder processing (recursive) with explicit `--folder`, where all `.xlsx` files are merged and treated as one dataset
 
 ## Requirements
 
@@ -36,15 +36,10 @@ python script.py --folder 2025
 python script.py --folder 2026
 ```
 
-### Process default files
-
-If `--folder` is not provided, the script processes:
-
-- `1.xlsx`
-- `2.xlsx`
+### Process a single file
 
 ```bash
-python script.py
+python script.py --file 1.xlsx
 ```
 
 ### Optional anomaly threshold factor
