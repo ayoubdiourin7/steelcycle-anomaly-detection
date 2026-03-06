@@ -2,8 +2,8 @@
 
 This project analyzes EAF cycle Excel files and generates anomaly plots for:
 
-- `Energie / FEM (4)`
-- `(Energie / FEM (4)) / Tap to Tap`
+- `Energie_Tappe_PowerOn = (Energie Elec. / Poids Tappé) * Power On`
+- `Energie_Tappe = Energie Elec. / Poids Tappé`
 
 It supports:
 
@@ -46,7 +46,7 @@ python script.py --file 1.xlsx
 
 Default threshold is:
 
-`mean + 1.0 * std`
+`Lower = Q1 - 1.5 * IQR` and `Upper = Q3 + 1.5 * IQR`
 
 You can change it:
 
@@ -58,12 +58,12 @@ python script.py --folder 2025 --factor 1.5
 
 For each processed folder, the script writes:
 
-- `*_fem4_anomalies.png`
-- `*_fem4_counts.png`
-- `*_fem4_per_tap_to_tap_anomalies.png`
-- `*_fem4_per_tap_to_tap_counts.png`
+- `*_energie_tappe_power_on_anomalies.png`
+- `*_energie_tappe_power_on_counts.png`
+- `*_energie_tappe_anomalies.png`
+- `*_energie_tappe_counts.png`
 
 ## Notes
 
-- Rows with invalid denominators (`<= 0`) are excluded per metric.
+- Rows with invalid metric columns (`<= 0`) are excluded per metric (denominators and multipliers).
 - Count plot x-axis is forced to start at `0` to avoid visual negative values.

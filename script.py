@@ -6,15 +6,18 @@ import pandas as pd
 
 ENERGY_COLUMN_CANDIDATES = ["Energie Elec.", "Energie Elec. EAF"]
 METRICS = {
-    "fem4": {
-        "denominator_candidates": [["FEM (4)"]],
-        "ratio_label": "Energie / FEM (4)",
-        "y_label": "Energie (MWh) / FEM (4)",
+    "energie_tappe_power_on": {
+        "denominator_candidates": [["Poids Tappé", "Poids Tapp", "Poids Tappe"]],
+        "multiplier_candidates": [["Power On"]],
+        "energy_multiplier": 1.0,
+        "ratio_label": "Energie_Tappe_PowerOn = (Energie Elec. / Poids Tappé) * Power On",
+        "y_label": "Energie_Tappe * Power On",
     },
-    "fem4_per_tap_to_tap": {
-        "denominator_candidates": [["FEM (4)"], ["Tap to Tap", "T to T", "T toT"]],
-        "ratio_label": "(Energie / FEM (4)) / Tap to Tap",
-        "y_label": "Energie (MWh) / FEM (4) / Tap to Tap",
+    "energie_tappe": {
+        "denominator_candidates": [["Poids Tappé", "Poids Tapp", "Poids Tappe"]],
+        "energy_multiplier": 1.0,
+        "ratio_label": "Energie_Tappe = Energie Elec. / Poids Tappé",
+        "y_label": "Energie_Tappe",
     },
 }
 
@@ -46,8 +49,13 @@ def _read_excel(path: Path) -> pd.DataFrame | None:
 
 
 def _prepare_metric_dataframe(
-    df: pd.DataFrame, energy_column: str, denominator_columns: list[str]
+    df: pd.DataFrame,
+    energy_column: str,
+    denominator_columns: list[str],
+    multiplier_columns: list[str] | None = None,
+    energy_multiplier: float = 1.0,
 ) -> tuple[pd.DataFrame, int]:
+    multiplier_columns = multiplier_columns or []
     df_work = df.copy()
     if "Cycle" not in df_work.columns:
         df_work["Cycle"] = range(1, len(df_work) + 1)
@@ -55,18 +63,24 @@ def _prepare_metric_dataframe(
     df_work[energy_column] = pd.to_numeric(df_work[energy_column], errors="coerce")
     for denominator_column in denominator_columns:
         df_work[denominator_column] = pd.to_numeric(df_work[denominator_column], errors="coerce")
+    for multiplier_column in multiplier_columns:
+        df_work[multiplier_column] = pd.to_numeric(df_work[multiplier_column], errors="coerce")
 
     valid_denominator_mask = pd.Series(True, index=df_work.index)
     for denominator_column in denominator_columns:
         valid_denominator_mask &= df_work[denominator_column] > 0
+    for multiplier_column in multiplier_columns:
+        valid_denominator_mask &= df_work[multiplier_column] > 0
     ignored_rows = int((~valid_denominator_mask).sum())
     df_metric = df_work.loc[valid_denominator_mask].copy()
     if df_metric.empty:
         return df_metric, ignored_rows
 
-    ratio = df_metric[energy_column]
+    ratio = df_metric[energy_column] * energy_multiplier
     for denominator_column in denominator_columns:
         ratio = ratio / df_metric[denominator_column]
+    for multiplier_column in multiplier_columns:
+        ratio = ratio * df_metric[multiplier_column]
     df_metric["Ratio"] = ratio
     df_metric = df_metric[df_metric["Ratio"].notna()].copy()
     return df_metric, ignored_rows
@@ -83,17 +97,22 @@ def _save_metric_plots(
     anomaly_factor: float,
 ) -> None:
     ratio_values = df_metric["Ratio"]
-    ratio_std = ratio_values.std()
-    threshold = ratio_values.mean() if pd.isna(ratio_std) else ratio_values.mean() + anomaly_factor * ratio_std
-    df_metric["Anomalie"] = df_metric["Ratio"] > threshold
+    q1 = ratio_values.quantile(0.25)
+    q3 = ratio_values.quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 if pd.isna(iqr) else q1 - anomaly_factor * iqr
+    upper_bound = q3 if pd.isna(iqr) else q3 + anomaly_factor * iqr
+    df_metric["Anomalie"] = (df_metric["Ratio"] < lower_bound) | (df_metric["Ratio"] > upper_bound)
 
     anomaly_output_file = output_dir / f"{output_prefix}_{metric_name}_anomalies.png"
     ratio_count_output_file = output_dir / f"{output_prefix}_{metric_name}_counts.png"
 
     # Plot 1: ratio by cycle with anomaly zone.
-    y_top = max(float(ratio_values.max()) * 1.05, float(threshold) * 1.05)
+    y_min = min(float(ratio_values.min()) * 0.95, float(lower_bound) * 0.95)
+    y_top = max(float(ratio_values.max()) * 1.05, float(upper_bound) * 1.05)
     plt.figure(figsize=(12, 6))
-    plt.axhspan(threshold, y_top, color="#f8d7da", alpha=0.4, label="Zone anormale")
+    plt.axhspan(y_min, lower_bound, color="#fee2e2", alpha=0.4, label="Zone anormale (basse)")
+    plt.axhspan(upper_bound, y_top, color="#f8d7da", alpha=0.4, label="Zone anormale (haute)")
     plt.plot(df_metric["Cycle"], df_metric["Ratio"], label=ratio_label, color="#1d4ed8", linewidth=1.7)
     plt.scatter(
         df_metric.loc[~df_metric["Anomalie"], "Cycle"],
@@ -112,11 +131,12 @@ def _save_metric_plots(
         s=52,
         label="Anomalie",
     )
-    plt.axhline(threshold, color="#ea580c", linestyle="--", linewidth=1.8, label="Seuil Anomalie")
+    plt.axhline(lower_bound, color="#f59e0b", linestyle="--", linewidth=1.6, label="Seuil Bas")
+    plt.axhline(upper_bound, color="#ea580c", linestyle="--", linewidth=1.8, label="Seuil Haut")
     plt.text(
         float(df_metric["Cycle"].min()),
-        float(threshold) * 1.01,
-        f"Seuil = {threshold:.3f}",
+        float(upper_bound) * 1.01,
+        f"Bas={lower_bound:.3f} | Haut={upper_bound:.3f}",
         color="#9a3412",
         fontsize=10,
         va="bottom",
@@ -138,17 +158,21 @@ def _save_metric_plots(
         step = (float(ratio_counts.index.max()) - float(ratio_counts.index.min())) / (len(ratio_counts) - 1)
         bar_width = max(step * 0.8, 0.002)
 
-    bar_colors = ["#dc2626" if value > threshold else "#0f766e" for value in ratio_counts.index]
-    x_max = max(float(ratio_counts.index.max()), float(threshold))
+    bar_colors = ["#dc2626" if (value < lower_bound or value > upper_bound) else "#0f766e" for value in ratio_counts.index]
+    x_left = 0.0
+    x_max = max(float(ratio_counts.index.max()), float(upper_bound))
 
     plt.figure(figsize=(12, 6))
-    plt.axvspan(threshold, x_max + bar_width, color="#f8d7da", alpha=0.45, label="Zone anormale")
+    if lower_bound > x_left:
+        plt.axvspan(x_left, lower_bound, color="#fee2e2", alpha=0.45, label="Zone anormale (basse)")
+    plt.axvspan(upper_bound, x_max + bar_width, color="#f8d7da", alpha=0.45, label="Zone anormale (haute)")
     plt.bar(ratio_counts.index, ratio_counts.values, width=bar_width, color=bar_colors, edgecolor="white", linewidth=0.3)
-    plt.axvline(threshold, color="#ea580c", linestyle="--", linewidth=2, label="Seuil Anomalie")
+    plt.axvline(lower_bound, color="#f59e0b", linestyle="--", linewidth=1.8, label="Seuil Bas")
+    plt.axvline(upper_bound, color="#ea580c", linestyle="--", linewidth=2, label="Seuil Haut")
     plt.text(
-        threshold + (bar_width * 0.8),
+        upper_bound + (bar_width * 0.8),
         float(ratio_counts.max()) * 0.95,
-        f"Anomalie si ratio > {threshold:.3f}",
+        f"Anomalie si ratio < {lower_bound:.3f} ou > {upper_bound:.3f}",
         color="#9a3412",
         fontsize=10,
         ha="left",
@@ -157,7 +181,7 @@ def _save_metric_plots(
     plt.title(f"{title_label}: Distribution {ratio_label}")
     plt.xlabel(f"{ratio_label} (arrondi a 0.01)")
     plt.ylabel("Nombre de cycles")
-    plt.xlim(left=0)
+    plt.xlim(left=x_left)
     plt.grid(axis="y", alpha=0.25)
     plt.legend()
     plt.tight_layout()
@@ -190,15 +214,35 @@ def _process_dataframe(
                 missing_candidates.append(candidates)
             else:
                 resolved_denominators.append(denominator)
-        if missing_candidates:
-            print(f"Skipping metric '{metric_name}': missing denominator column in {missing_candidates}")
+        resolved_multipliers: list[str] = []
+        missing_multiplier_candidates: list[list[str]] = []
+        for candidates in metric.get("multiplier_candidates", []):
+            multiplier = _resolve_column_name(df_base.columns, candidates)
+            if multiplier is None:
+                missing_multiplier_candidates.append(candidates)
+            else:
+                resolved_multipliers.append(multiplier)
+
+        if missing_candidates or missing_multiplier_candidates:
+            missing_text: list[str] = []
+            if missing_candidates:
+                missing_text.append(f"denominator column in {missing_candidates}")
+            if missing_multiplier_candidates:
+                missing_text.append(f"multiplier column in {missing_multiplier_candidates}")
+            print(f"Skipping metric '{metric_name}': missing {' and '.join(missing_text)}")
             continue
 
         ratio_label = metric["ratio_label"]
         y_label = metric["y_label"]
-        df_metric, ignored_rows = _prepare_metric_dataframe(df_base, energy_column, resolved_denominators)
-        denom_text = " and ".join(resolved_denominators)
-        print(f"[{metric_name}] Ignored rows with invalid denominators ({denom_text} <= 0): {ignored_rows}")
+        df_metric, ignored_rows = _prepare_metric_dataframe(
+            df_base,
+            energy_column,
+            resolved_denominators,
+            multiplier_columns=resolved_multipliers,
+            energy_multiplier=float(metric.get("energy_multiplier", 1.0)),
+        )
+        valid_columns_text = " and ".join(resolved_denominators + resolved_multipliers)
+        print(f"[{metric_name}] Ignored rows with invalid metric columns ({valid_columns_text} <= 0): {ignored_rows}")
         if df_metric.empty:
             print(f"[{metric_name}] No valid rows left after filtering, skipping plots.")
             continue
@@ -215,7 +259,7 @@ def _process_dataframe(
         )
 
 
-def process_file(input_file: str, anomaly_factor: float = 1.0) -> None:
+def process_file(input_file: str, anomaly_factor: float = 1.5) -> None:
     path = Path(input_file)
     if not path.exists():
         print(f"File not found: {input_file}")
@@ -235,7 +279,7 @@ def process_file(input_file: str, anomaly_factor: float = 1.0) -> None:
     )
 
 
-def process_folder(input_folder: str, anomaly_factor: float = 1.0) -> None:
+def process_folder(input_folder: str, anomaly_factor: float = 1.5) -> None:
     folder = Path(input_folder)
     if not folder.exists() or not folder.is_dir():
         print(f"Invalid folder: {input_folder}")
@@ -292,8 +336,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--factor",
         type=float,
-        default=1.0,
-        help="Anomaly threshold factor: threshold = mean + factor * std (default: 1.0).",
+        default=1.5,
+        help="Outlier factor for IQR bounds: lower = Q1 - factor * IQR, upper = Q3 + factor * IQR (default: 1.5).",
     )
     args = parser.parse_args()
 
