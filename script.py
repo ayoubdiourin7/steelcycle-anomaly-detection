@@ -107,12 +107,9 @@ def _save_metric_plots(
     anomaly_output_file = output_dir / f"{output_prefix}_{metric_name}_anomalies.png"
     ratio_count_output_file = output_dir / f"{output_prefix}_{metric_name}_counts.png"
 
-    # Plot 1: ratio by cycle with anomaly zone.
-    y_min = min(float(ratio_values.min()) * 0.95, float(lower_bound) * 0.95)
+    # Plot 1: ratio by cycle with IQR bounds.
     y_top = max(float(ratio_values.max()) * 1.05, float(upper_bound) * 1.05)
     plt.figure(figsize=(12, 6))
-    plt.axhspan(y_min, lower_bound, color="#fee2e2", alpha=0.4, label="Zone anormale (basse)")
-    plt.axhspan(upper_bound, y_top, color="#f8d7da", alpha=0.4, label="Zone anormale (haute)")
     plt.plot(df_metric["Cycle"], df_metric["Ratio"], label=ratio_label, color="#1d4ed8", linewidth=1.7)
     plt.scatter(
         df_metric.loc[~df_metric["Anomalie"], "Cycle"],
@@ -131,8 +128,8 @@ def _save_metric_plots(
         s=52,
         label="Anomalie",
     )
-    plt.axhline(lower_bound, color="#f59e0b", linestyle="--", linewidth=1.6, label="Seuil Bas")
-    plt.axhline(upper_bound, color="#ea580c", linestyle="--", linewidth=1.8, label="Seuil Haut")
+    plt.axhline(lower_bound, color="#dc2626", linestyle="--", linewidth=1.6, label="Seuil Bas")
+    plt.axhline(upper_bound, color="#dc2626", linestyle="--", linewidth=1.8, label="Seuil Haut")
     plt.text(
         float(df_metric["Cycle"].min()),
         float(upper_bound) * 1.01,
@@ -160,15 +157,11 @@ def _save_metric_plots(
 
     bar_colors = ["#dc2626" if (value < lower_bound or value > upper_bound) else "#0f766e" for value in ratio_counts.index]
     x_left = 0.0
-    x_max = max(float(ratio_counts.index.max()), float(upper_bound))
 
     plt.figure(figsize=(12, 6))
-    if lower_bound > x_left:
-        plt.axvspan(x_left, lower_bound, color="#fee2e2", alpha=0.45, label="Zone anormale (basse)")
-    plt.axvspan(upper_bound, x_max + bar_width, color="#f8d7da", alpha=0.45, label="Zone anormale (haute)")
     plt.bar(ratio_counts.index, ratio_counts.values, width=bar_width, color=bar_colors, edgecolor="white", linewidth=0.3)
-    plt.axvline(lower_bound, color="#f59e0b", linestyle="--", linewidth=1.8, label="Seuil Bas")
-    plt.axvline(upper_bound, color="#ea580c", linestyle="--", linewidth=2, label="Seuil Haut")
+    plt.axvline(lower_bound, color="#dc2626", linestyle="--", linewidth=1.8, label="Seuil Bas")
+    plt.axvline(upper_bound, color="#dc2626", linestyle="--", linewidth=2, label="Seuil Haut")
     plt.text(
         upper_bound + (bar_width * 0.8),
         float(ratio_counts.max()) * 0.95,
