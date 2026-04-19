@@ -16,28 +16,12 @@ It supports:
 
 The repository includes generated yearly visualization examples for `2024`, `2025`, and `2026`.
 
-## Why It Fits Power BI
-
-This repository is a good base for a Power BI reporting workflow because it already produces the core visual story:
-
-- trend monitoring by cycle
-- anomaly highlighting with lower and upper thresholds
-- distribution views to spot concentration and outliers
-- grade-level drill-down for operational segmentation
-
-In Power BI terms, these outputs map naturally to:
-
-- KPI cards: total cycles, anomalous cycles, anomaly rate, median ratio
-- trend page: cycle-by-cycle monitoring with anomaly thresholds
-- distribution page: count view showing normal values vs. out-of-range bins
-- drill-down page: slicers by year, metric, and grade
-
 ## Visualization Demo
 
 ### Year-Level Monitoring
 
-| Anomaly trend view | Distribution view |
-| --- | --- |
+| Anomaly trend view                                                    | Distribution view                                                      |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | ![2025 anomaly trend](2025/2025_all_xlsx_energie_tappe_anomalies.png) | ![2025 distribution view](2025/2025_all_xlsx_energie_tappe_counts.png) |
 
 These two views are the closest match to a standard Power BI monitoring page:
@@ -47,8 +31,8 @@ These two views are the closest match to a standard Power BI monitoring page:
 
 ### Drill-Down by Grade and Metric
 
-| Standard metric view | Power On metric view |
-| --- | --- |
+| Standard metric view                                                          | Power On metric view                                                                   |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | ![2024 standard anomaly view](2024/2024_all_xlsx_energie_tappe_anomalies.png) | ![2026 power on anomaly view](2026/2026_all_xlsx_energie_tappe_power_on_anomalies.png) |
 
 This is the part that makes the project especially useful for Power BI-style analysis:
@@ -153,20 +137,6 @@ If you want to turn this repository into a more complete Power BI project, this 
    Histogram or column chart showing normal range vs. anomalous values.
 4. Grade Analysis
    Slicers for `Year`, `Grade`, and `Metric`, plus a detailed anomaly trend chart.
-
-## Next Step to Make It Even More Power BI-Native
-
-The current project already generates strong visual outputs. The next logical improvement would be to export anomaly detail tables such as:
-
-- `cycle`
-- `grade`
-- `metric`
-- `ratio`
-- `is_anomaly`
-- `lower_bound`
-- `upper_bound`
-
-That would allow direct import into Power BI for fully interactive dashboards, DAX measures, and slicer-based exploration.
 
 ## Notes
 
